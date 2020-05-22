@@ -1,60 +1,77 @@
-file_input = ARGV[0]
-target_search = ARGV[1]
-target_str = ARGV[2]
+require 'optparse'
 
-
-def GetColumn(file, colnum)
- arr = []
- i = 0
- file.each do |f1|
-  arr[i] = f1.split("\t")[colnum]
-  i +=1
- end
- return arr
+############################################################################################
+## METHODS
+############################################################################################
+def load_file(file)
+  records = []
+  File.open(file).each do |line|
+    line.chomp!
+    fields = line.split("\t")
+    records << fields 
+  end
+ return records
 end
 
-def GetIndex(column, string, exact_match)
-  index = []
-  i = 0
-  column.each do |f2|
-  if exact_match  
-    if f2 == string
-      index << i
-    end
-  else
-    if /#{string}/.match(f2)
-        index << i
+def extract_records(records, col_num, keyword, full_match)
+  selected_records = []
+  records.each do |record|
+    search_field = record[col_num]
+    if full_match && search_field == keyword
+        selected_records << record
+    elsif !full_match && search_field.include?(keyword)
+        selected_records << record
     end
   end
-  i += 1
-  end
-  return index
+  # selected_records = records.select do |record|
+  #   search_field = record[col_num]
+  #   full_match && search_field == keyword ||!full_match && search_field.include?(keyword)
+  # end
+  return selected_records
 end
 
-lines = File.readlines(file_input)
-col_num = 0
+############################################################################################
+## OPTPARSE
+############################################################################################
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: "File.basename(__FILE__)" [options]"
 
-ex_match = false
+  options[:input] = nil
+  opts.on("-i", "--input PATH", "Path to input file") do |item|
+    options[:input] = item
+  end
 
-if target_search == "VariationID"
+  options[:target_search] = 'phenotype'
+  opts.on("-t", "--target_search STRING", "Field in which to perform the search. Tags are 'variation_id', 'phenotype', 'gene', 'significance'. Default 'phenotype' ") do |item|
+    options[:input] = item
+  end
+
+  options[:keyword] = nil
+  opts.on("-k", "--keyword STRING", "String to use in the search") do |item|
+    options[:keyword] = item
+  end
+end.parse!
+
+############################################################################################
+## MAIN
+############################################################################################
+records = load_file(options[:input])
+
+
+full_match = true
+
+col_num = nil
+if options[:target_search] == "variation_id"
   col_num = 0
-  ex_match = true
-elsif target_search == "Phenotype"
+elsif options[:target_search] == "phenotype"
   col_num = 5
-elsif target_search == "Gene"
+  full_match = false
+elsif options[:target_search] == "gene"
   col_num = 11
-  exact_match =true
-elsif target_search == "Significance"
+elsif options[:target_search] == "significance"
   col_num = 1
-  exact_match =true
 end
 
-col = GetColumn(lines, col_num)
+records = extract_records(records, col_num, options[:keyword], full_match)
 
-#col.group_by(&:itself).transform_values(&:count)
-
-index = GetIndex(col, target_str, ex_match)
-
-index.each do |ix|
-  puts lines[ix]
-end
